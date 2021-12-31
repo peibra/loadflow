@@ -1,244 +1,253 @@
+"""Manage power system parameter and calculate load flow.
+"""
+
+import copy
+
 import numpy as np
 
 
-class Nodes:
-    _n = 0
-    _bc = []
-    _P = []
-    _Q = []
-    _V = []
-    _theta = []
-    p = []
-    _p_content = []
-    v = []
-    _v_content = []
+class PowerSystem:
+    """Manage power system parameter.
 
-    def _initialize_p(self):
-        Nodes.p = []
-        Nodes._p_content = []
-        for id in range(Nodes._n):
-            if Nodes._P[id] is not None:
-                Nodes.p.append(Nodes._P[id])
-                Nodes._p_content.append(('P', id))
-            if Nodes._Q[id] is not None:
-                Nodes.p.append(Nodes._Q[id])
-                Nodes._p_content.append(('Q', id))
+    Parameters
+    ----------
+    n : int
+        The number of nodes in the system.
 
-    def _initialize_v(self):
-        Nodes.v = []
-        Nodes._v_content = []
-        for id in range(Nodes._n):
-            if Nodes._theta[id] is None:
-                Nodes.v.append(0.)
-                Nodes._v_content.append(('θ', id))
-            if Nodes._V[id] is None:
-                Nodes.v.append(1.)
-                Nodes._v_content.append(('V', id))
+    Attributes
+    ----------
+    r : numpy.ndarray(n, n) of float
+        `r[i, j]` is the resistance of branch i-j (the default of the
+        values is inf).
+    x : numpy.ndarray(n, n) of float
+        `x[i, j]` is the reactance of branch i-j (the default of the
+        values is 0.).
+    b : numpy.ndarray(n, n) of float
+        `b[i, j]` is the susceptance of branch i-j (the default of the
+        values is 0.).
+    bc : numpy.ndarray(n,) of float
+        `bc[i]` is the susceptance of node[i] (the default of the
+        values is 0.).
+    Y : numpy.ndarray(n,n) of complex
+        `Y` is the node-admittance matrix.
 
-    def __init__(self, bc=0, P=None, Q=None,
-                 V=None, theta=None,
-                 is_generator=False):
-        self.__id = Nodes._n
-        Nodes._n += 1
-        self.is_load = not is_generator
-        self._is_generator = is_generator
-        if self._is_generator:
-            self.__bci = 0
-        else:
-            self.__bci = bc
-        Nodes._bc.append(0)
-        Nodes._bc[self.id] = bc
-        Nodes._modified_par = True
-        self.__P = P
-        self.__Q = Q
-        self.__V = V
-        self.__theta = theta
-        Nodes._P.append(0)
-        Nodes._P[self.id] = P
-        Nodes._Q.append(0)
-        Nodes._Q[self.id] = Q
-        Nodes._V.append(0)
-        Nodes._V[self.id] = V
-        Nodes._theta.append(0)
-        Nodes._theta[self.id] = theta
-        self._initialize_p()
-        self._initialize_v()
+    P : list of float or None
+        `P[i]` is the real power of node[i] (the default of the
+        values is None).
+    Q : list of float or None
+        `Q[i]` is the reactive power of node[i] (the default of the
+        values is None).
+    V : list of float or None
+        `V[i]` is the voltage of node[i] (the default of the
+        values is None).
+    theta : list of float or None
+        `Q[i]` is the phase of node[i] (the default of the
+        values is None).
 
-    @classmethod
-    @property
-    def n(cls):
-        return Nodes._n
+    """
 
-    @property
-    def id(self):
-        return self.__id
+    def __init__(self, n):
+        self._n = n
+        self._r = np.full([n, n], float('inf'))
+        self._r_copy = copy.deepcopy(self._r)
+        self._x = np.zeros([n, n])
+        self._x_copy = copy.deepcopy(self._x)
+        self._b = np.zeros([n, n])
+        self._b_copy = copy.deepcopy(self._b)
+        self.bc = np.zeros(n)
+        self.P = [None] * n
+        self.Q = [None] * n
+        self.V = [None] * n
+        self.theta = [None] * n
 
-    @property
-    def is_generator(self):
-        return self._is_generator
+    def _initialize_vec(self):
+        self._p = []
+        self._p_content = []
+        self._v = []
+        self._v_content = []
 
-    @property
-    def bc(self):
-        return self.__bci
-
-    @bc.setter
-    def bc(self, bc):
-        if self._is_generator:
-            self.__bci = 0
-        else:
-            self.__bci = bc
-        Nodes._bc[self.__id] = bc
-        Nodes._modified_par = True
-
-    @property
-    def P(self):
-        return self.__P
-
-    @P.setter
-    def P(self, P):
-        self.__P = P
-        Nodes._P[self.id] = P
-        self._initialize_p()
-
-    @property
-    def Q(self):
-        return self.__Q
-
-    @Q.setter
-    def Q(self, Q):
-        self.__Q = Q
-        Nodes._Q[self.id] = Q
-        self._initialize_p()
-
-    @property
-    def V(self):
-        return self.__V
-
-    @V.setter
-    def V(self, V):
-        self.__V = V
-        Nodes._V[self.id] = V
-        self._initialize_v()
-
-    @property
-    def theta(self):
-        return self.__theta
-
-    @theta.setter
-    def theta(self, theta):
-        self.__theta = theta
-        Nodes._theta[self.id] = theta
-        self._initialize_v()
-
-    @classmethod
-    def can_calculate_load_flow(cls):
-        if len(Nodes.p) != len(Nodes.v) or len(Nodes.p) == 2 * Nodes._n:
-            return False
-        else:
-            return True
-
-
-class Branches(Nodes):
-    def __init__(self):
-        self.__r = np.full([Nodes._n, Nodes._n], float('inf'))
-        self.__x = np.zeros([Nodes._n, Nodes._n])
-        self.__b = np.zeros([Nodes._n, Nodes._n])
-        self.__n = Nodes._n
-
-    def set_r(self, node, r):
-        i, j = node[0].id, node[1].id
-        if i != j:
-            self.__r[i, j] = r
-            j, i = node[0].id, node[1].id
-            self.__r[i, j] = r
-            Nodes._modified_par = True
-
-    @property
-    def r(self):
-        return self.__r
-
-    def set_x(self, node, x):
-        i, j = node[0].id, node[1].id
-        if i != j:
-            self.__x[i, j] = x
-            j, i = node[0].id, node[1].id
-            self.__x[i, j] = x
-            Nodes._modified_par = True
-
-    @property
-    def x(self):
-        return self.__x
-
-    def set_b(self, node, b):
-        i, j = node[0].id, node[1].id
-        if i != j:
-            self.__b[i, j] = b
-            j, i = node[0].id, node[1].id
-            self.__b[i, j] = b
-            Nodes._modified_par = True
-
-    @property
-    def b(self):
-        return self.__b
+        for i in range(self._n):
+            if self.P[i] is not None:
+                self._p.append(self.P[i])
+                self._p_content.append(('P', i))
+            if self.Q[i] is not None:
+                self._p.append(self.Q[i])
+                self._p_content.append(('Q', i))
+            if self.theta[i] is None:
+                self._v.append(0.)
+                self._v_content.append(('θ', i))
+            if self.V[i] is None:
+                self._v.append(1.)
+                self._v_content.append(('V', i))
 
     def _Y_diag(self, i, r, x, b, bc):
+        """Calculate the diagonal components of node-admittance matrix Y.
+
+        Parameters
+        ----------
+        i : int
+            Row index.
+        r : numpy.ndarray(n, n) of float
+            Resistance matrix.
+        x : numpy.ndarray(n, n) of float
+            Reactance matrix.
+        b : numpy.ndarray(n, n) of float
+            Admittance matrix.
+        bc : numpy.ndarray(n,) of float
+            Admittance of node.
+
+        Returns
+        -------
+        diagonal_component : complex
+        """
+
         return sum([1 / (R + 1j*X) + 1j*B / 2
                     for j, (R, X, B)
                     in enumerate(zip(r[i], x[i], b[i])) if j != i
                     ]) + 1j*bc[i]
 
     def _Y_nondiag(self, r, x):
+        """Calculate the non-diagonal components of admittance matrix Y.
+
+        Parameters
+        ----------
+        r : float
+            Resistance.
+        x : float
+            Reactance.
+
+        Returns
+        -------
+        non_diagonal_component : complex
+        """
+
         return - 1 / (r + 1j*x)
 
     @property
+    def n(self):
+        """The number of nodes in the system.
+        """
+        return self._n
+
+    @property
+    def r(self):
+        """The resistance matrix.
+
+        `r` is accessed just like any other numpy array but automatically
+        gets coverted to a symmetric matrix.
+
+        Example
+        -------
+        >>> some_instance.r
+        array([[inf, inf],
+               [inf, inf]])
+
+        >>> some_instance.r[1, 0] = 0.1
+        >>> some_instance.r
+        array([[inf, 0.1],
+               [0.1, inf]])
+        """
+        i, j = np.where(np.not_equal(self._r_copy, self._r))
+        self._r[i, j] = self._r_copy[i, j]
+        self._r[j, i] = self._r_copy[i, j]
+        self._r_copy = copy.deepcopy(self._r)
+
+        return self._r_copy
+
+    @property
+    def x(self):
+        """The reactance matrix.
+
+        See Also
+        --------
+        r : The resistance matrix.
+        """
+        i, j = np.where(np.not_equal(self._x_copy, self._x))
+        self._x[i, j] = self._x_copy[i, j]
+        self._x[j, i] = self._x_copy[i, j]
+        self._x_copy = copy.deepcopy(self._x)
+
+        return self._x_copy
+
+    @property
+    def b(self):
+        """The susceptance matrix.
+
+        See Also
+        --------
+        r : The resistance matrix.
+        """
+        i, j = np.where(np.not_equal(self._b_copy, self._b))
+        self._b[i, j] = self._b_copy[i, j]
+        self._b[j, i] = self._b_copy[i, j]
+        self._b_copy = copy.deepcopy(self._b)
+
+        return self._b_copy
+
+    @property
     def Y(self):
-        if Nodes._modified_par is False:
-            return self.__Y
-        self.__Y = np.zeros([Nodes._n, Nodes._n], dtype=complex)
-        Nodes._modified_par = False
-        bc = np.array(super()._bc)
-        di = np.diag_indices(self.__n)
-        E = np.eye(self.__n, dtype=int)
-        self.__Y[di] = [self._Y_diag(i, self.__r, self.__x,
-                                     self.__b, bc)
-                        for i in range(self.__n)]
-        self.__Y += np.where(E == 0,
-                             self._Y_nondiag(self.__r, self.__x), 0)
-        return self.__Y
+        """The node-admittance matrix calculated from r, x and b.
+        """
 
-    def can_calculate_load_flow(self):
-        for row in self.__r:
-            for item in row:
-                if item != float('inf'):
-                    return True
-        return False
+        self._Y = np.zeros([self._n, self._n], dtype=complex)
+
+        di = np.diag_indices(self._n)
+        E = np.eye(self._n, dtype=int)
+
+        self._Y[di] = [self._Y_diag(i, self.r, self.x, self.b, self.bc)
+                       for i in range(self._n)]
+        self._Y += np.where(E == 0, self._Y_nondiag(self.r, self.x), 0)
+
+        return self._Y
 
 
-class LoadFlow():
+class LoadFlow:
+    """Calculate load flow
 
-    def calculate(self, nodes):
+    Parameters
+    ----------
+    ps : obj
+        Instance of PowerSystem class.
 
-        if not (nodes.can_calculate_load_flow() and
-                self.branches.can_calculate_load_flow()):
-            raise Exception('計算が出来ません')
+    Attributes
+    ----------
+    V : list of float
+        Results of the voltage of each node.
+    P : numpy.ndarray(n,n) of complex
+        Results of power flow.
 
-        if nodes._modified_par:
-            self.Y = self.branches.Y
+    Methods
+    -------
+    calculate()
+        Calculate load flow.
+    """
 
-        n = nodes._n
-        n_p = len(nodes.v)
+    def __init__(self, ps):
+        self.ps = ps
+
+    def calculate(self):
+        """Calculate load flow
+
+        Calculates the load flow of a given power system using
+        Newton-Raphson method. The threshold for ending calculation
+        is 0.001.
+        """
+        n = self.ps._n
         cnt = 0
 
-        Y = self.Y
+        Y = self.ps.Y
         G = Y.real
         B = Y.imag
 
-        V = np.array([V if V is not None else 1. for V in nodes._V])
+        V = np.array([V if V is not None else 1. for V in self.ps.V])
         theta = np.array([theta if theta is not None else 0.
-                          for theta in nodes._theta])
+                          for theta in self.ps.theta])
 
-        v = np.array(nodes.v).reshape([n_p, 1])
-        p = np.array(nodes.p).reshape([n_p, 1])
+        self.ps._initialize_vec()
+        n_p = len(self.ps._p)
+
+        v = np.array(self.ps._v).reshape([n_p, 1])
+        p = np.array(self.ps._p).reshape([n_p, 1])
 
         fnc_v = np.zeros(n_p).reshape([n_p, 1])
 
@@ -252,14 +261,15 @@ class LoadFlow():
                                - B[i, j]*np.cos(theta[i] - theta[j]))
                        for j in range(n)]) * V[i] for i in range(n)]
 
-            # ヤコビ行列の計算
+            # Calculate Jacobian
 
             dfPi_dthetaj = np.zeros([n, n])
             dfQi_dthetaj = np.zeros([n, n])
             dfPi_dVj = np.zeros([n, n])
             dfQi_dVj = np.zeros([n, n])
 
-            # i == j の時
+            # i == j
+
             di = np.diag_indices(n)
 
             dfPi_dthetaj[di] = [- V[i]**2 * B[i, i] - fQ[i]
@@ -271,7 +281,8 @@ class LoadFlow():
             dfQi_dVj[di] = [- V[i] * B[i, i] + fQ[i]/V[i]
                             for i in range(n)]
 
-            # i != j の時
+            # i != j
+
             E = np.eye(n, dtype=int)
 
             ViVj = V.reshape([n, 1]).dot(V.reshape(1, n))
@@ -294,20 +305,21 @@ class LoadFlow():
             J_dict = {'P': {'θ': dfPi_dthetaj, 'V': dfPi_dVj},
                       'Q': {'θ': dfQi_dthetaj, 'V': dfQi_dVj}}
 
-            Jacobian = np.matrix([[J_dict[pj[0]][vj[0]][pj[1], vj[1]]
-                                  for vj in nodes._v_content]
-                                  for pj in nodes._p_content])
+            Jacobian = np.array([[J_dict[pc[0]][vc[0]][pc[1], vc[1]]
+                                  for vc in self.ps._v_content]
+                                 for pc in self.ps._p_content])
 
             f_dict = {'P': fP, 'Q': fQ}
 
-            fnc_v[:, 0] = [f_dict[pf[0]][pf[1]]
-                           for pf in nodes._p_content]
+            fnc_v = np.array([f_dict[pc[0]][pc[1]]
+                              for pc
+                              in self.ps._p_content]).reshape([n_p, 1])
 
             v += np.dot(np.linalg.inv(Jacobian), p - fnc_v)
 
             v_dict = {'V': V, 'θ': theta}
 
-            for i, (vv, id) in enumerate(nodes._v_content):
+            for i, (vv, id) in enumerate(self.ps._v_content):
                 v_dict[vv][id] = v[i, 0]
 
             cnt += 1
@@ -326,21 +338,17 @@ class LoadFlow():
 
             V_dot = V * [*map(lambda x: np.exp(1j * x), theta)]
 
-            br = self.branches
-            I_dash = [
-                [-1j * br.b[i, j]/2 * V_dot[i]
-                 + (V_dot[i] - V_dot[j]) / (br.r[i, j] + 1j * br.x[i, j])
+            I_prime = [
+                [-1j * self.ps.b[i, j]/2 * V_dot[i]
+                 + (V_dot[i] - V_dot[j]) /
+                    (self.ps.r[i, j] + 1j * self.ps.x[i, j])
                  for j in range(n)
                  ]
                 for i in range(n)
             ]
-            I_dash = np.array(I_dash)
+            I_prime = np.array(I_prime)
 
             self.power = np.tile(V_dot.reshape(
-                [n, 1]), n) * np.conjugate(I_dash)
+                [n, 1]), n) * np.conjugate(I_prime)
         else:
             self.power = None
-
-    def __init__(self, branches):
-        self.branches = branches
-        self.Y = branches.Y
