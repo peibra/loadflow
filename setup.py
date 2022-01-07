@@ -10,7 +10,7 @@ packages = [
 
 setup(
     name='loadflow',
-    version='4.0.0',
+    version='4.1.0',
     packages=packages,
     install_requires=install_requires,
 )
