@@ -1,4 +1,67 @@
 """Manage power system parameter and calculate load flow.
+
+All you need to know to use this is in the example below. PU method is used
+for the units. The number of known P, Q and unknown V, theta should be
+equal. If the program fails it will return None for every result.
+
+Example
+-------
+# -------------------------------------------------------------------------
+# |Node 0: V=1., theta=0., (P=unknown), (Q=unknown)|
+#         |
+#         | r=0.01, x=0.05, b=0.04
+#         |
+# |Node 1: (V=unknown), (theta=unknown), P=-0.6, Q=-0.3| == |bc=0.1|
+#         |
+#         | r=0.04, x=0.025, b=0.02
+#         |
+# |Node 2: (V=unknown), (theta=unknown), P=-0.6, Q=-0.3| == |bc=0.1|
+# -------------------------------------------------------------------------
+
+from loadflow import PowerSystem, LoadFlow
+
+ps = PowerSystem(3)  # set up a power system of 3 nodes
+
+ps.r[0, 1] = 0.01  # resistance between node 0 and node 1
+ps.r[1, 2] = 0.04
+
+ps.x[0, 1] = 0.05  # reactance
+ps.x[1, 2] = 0.025
+
+ps.b[0, 1] = 0.04  # susceptance
+ps.b[1, 2] = 0.02
+
+ps.bc[1] = 0.1  # susceptance of node 1 other than the branch connected to it
+ps.bc[2] = 0.1
+
+ps.P[1] = - 0.6
+ps.Q[1] = - 0.3
+ps.P[2] = - 0.6
+ps.Q[2] = - 0.3
+
+ps.V[0] = 1.
+ps.theta[0] = 0.
+
+lf = LoadFlow(ps)  # set up calculation process
+lf.calculate()
+
+print(lf.V)  # prints voltage magnitude
+>>> [1.0, 0.9651997474478232, 0.9340151566375318]
+
+print(lf.theta)  # prints voltage phase
+>>> [0.0, -0.05906500726151168, -0.06665066281793608]
+
+print(lf.P)  # prints effective power
+>>> [[ 0.          1.23602053  0.        ]
+     [-1.21841535  0.          0.61841531]
+     [ 0.         -0.59999996  0.        ]]
+
+print(lf.Q)  # prints reactive power
+>>> [[ 0.          0.50246384  0.        ]
+     [-0.37580572 -0.          0.22486348]
+     [ 0.         -0.19531394 -0.        ]]
+
+# lf.power returns complex power P + jQ
 """
 
 import copy
@@ -350,5 +413,9 @@ class LoadFlow:
 
             self.power = np.tile(V_dot.reshape(
                 [n, 1]), n) * np.conjugate(I_prime)
+            self.P = self.power.real
+            self.Q = self.power.imag
         else:
             self.power = None
+            self.P = None
+            self.Q = None
