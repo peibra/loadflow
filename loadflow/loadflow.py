@@ -275,9 +275,15 @@ class LoadFlow:
     Attributes
     ----------
     V : list of float
-        Results of the voltage of each node.
-    P : numpy.ndarray(n,n) of complex
+        Results of the voltage magnitude of each node.
+    theta : list of float
+        Results of the voltage phase of each node.
+    power : numpy.ndarray(n,n) of complex
         Results of power flow.
+    P : numpy.ndarray(n,n) of float
+        Real part of `power` (power.real).
+    Q : numpy.ndarray(n,n) of float
+        Imaginary part of `power` (power.imag).
 
     Methods
     -------
