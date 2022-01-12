@@ -265,7 +265,7 @@ class PowerSystem:
 
 
 class LoadFlow:
-    """Calculate load flow
+    """Calculate load flow.
 
     Parameters
     ----------
