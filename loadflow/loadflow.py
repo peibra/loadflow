@@ -295,7 +295,7 @@ class LoadFlow:
         self.ps = ps
 
     def calculate(self):
-        """Calculate load flow
+        """Calculate load flow.
 
         Calculates the load flow of a given power system using
         Newton-Raphson method. The threshold for ending calculation
