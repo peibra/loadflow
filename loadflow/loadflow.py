@@ -1,8 +1,8 @@
 """Manage power system parameter and calculate load flow.
 
-All you need to know to use this is in the example below. PU method is used
-for the units. The number of known P, Q and unknown V, theta should be
-equal. If the program fails it will return None for every result.
+PU method is used　for the units. The number of known P, Q and
+unknown V, theta should be equal. If the program fails it will return None
+for every result.
 
 Example
 -------
@@ -25,22 +25,23 @@ ps = PowerSystem(3)  # set up a power system of 3 nodes
 ps.r[0, 1] = 0.01  # resistance between node 0 and node 1
 ps.r[1, 2] = 0.04
 
-ps.x[0, 1] = 0.05  # reactance
+ps.x[0, 1] = 0.05  # reactance between node 0 and node 1
 ps.x[1, 2] = 0.025
 
-ps.b[0, 1] = 0.04  # susceptance
+ps.b[0, 1] = 0.04  # susceptance between node 0 and node 1
 ps.b[1, 2] = 0.02
 
-ps.bc[1] = 0.1  # susceptance of node 1 other than the branch connected to it
+ps.bc[1] = 0.1  # susceptance of node 1 other than ps.b[0, 1]
 ps.bc[2] = 0.1
 
-ps.P[1] = - 0.6
-ps.Q[1] = - 0.3
+ps.P[1] = - 0.6  # effective power of node 1 (this value is negative because
+                 # this node consumes power)
+ps.Q[1] = - 0.3  # reactive power of node 1
 ps.P[2] = - 0.6
 ps.Q[2] = - 0.3
 
-ps.V[0] = 1.
-ps.theta[0] = 0.
+ps.V[0] = 1.  # voltage magnitude of node 0
+ps.theta[0] = 0.  # voltage phase of node 0
 
 lf = LoadFlow(ps)  # set up calculation process
 lf.calculate()
