@@ -35,7 +35,9 @@ class LoadFlowTest(unittest.TestCase):
     def test_n(self):
         self.assertEqual(self.ps.n, 4)
 
-    def test_V(self):
-        self.lf = loadflow.LoadFlow(self.ps)
-        self.lf.calculate()
-        print(self.lf.V)
+    def test_calculate(self):
+        lf = loadflow.LoadFlow(self.ps)
+        lf.calculate()
+        self.assertIsNotNone(lf.V)
+        self.assertIsNotNone(lf.theta)
+        self.assertIsNotNone(lf.power)
